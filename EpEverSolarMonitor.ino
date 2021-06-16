@@ -619,7 +619,7 @@ void loop(){
   sprintf(buf, "20%02d-%02d-%02d %02d:%02d:%02d" ,
     rtc.r.y , rtc.r.M , rtc.r.d , rtc.r.h , rtc.r.m , rtc.r.s
   );
-  mqtt_publish_s( "solar/status/time", buf );
+  mqtt_publish_s( "homeassistant/solar/status/time", buf );
 
   
   // panel
@@ -653,7 +653,7 @@ void loop(){
   mqtt_publish_f( "homeassistant/solar/energy/consumed_all", stats.s.consEnerTotal/100.f );
 
   mqtt_publish_f( "homeassistant/solar/energy/generated_day", stats.s.genEnerDay/100.f );
-  mqtt_publish_f( "homeassistant/solar/energy/generated_day", stats.s.genEnerMon/100.f );
+  mqtt_publish_f( "homeassistant/solar/energy/generated_month", stats.s.genEnerMon/100.f );
   mqtt_publish_f( "homeassistant/solar/energy/generated_all",  stats.s.genEnerTotal/100.f );
 
 
@@ -662,7 +662,7 @@ void loop(){
 
   //mqtt_publish_s( "solar/status/charger_input", charger_input_status[ charger_input ]  );
   mqtt_publish_s( "homeassistant/solar/status/charger_mode",  charger_charging_status[ charger_mode ] );
-  mqtt_publish_f( "homeassistant/solar/status/battery_temp",  live.l.bT /100.f );
+  mqtt_publish_f( "homeassistant/solar/battery/Temperature",  live.l.bT /100.f );
 
 
 
@@ -696,7 +696,7 @@ void loop(){
     
   }
   
-  mqtt_publish_s("solar", "sleep");
+  mqtt_publish_s("homeassistant/solar", "sleep");
   delay(1000);
   
   
@@ -793,12 +793,12 @@ void mqtt_reconnect() {
       Serial.println("connected");
       
       // Once connected, publish an announcement...
-      mqtt_client.publish("solar", "online");
+      mqtt_client.publish("homeassistant/solar", "online");
       do_update = 1;
       
       // ... and resubscribe
-      mqtt_client.subscribe("solar/load/control");
-      mqtt_client.subscribe("solar/setting/sleep");
+      mqtt_client.subscribe("homeassistant/solar/load/control");
+      mqtt_client.subscribe("homeassistant/solar/setting/sleep");
       
       
     } else {
@@ -831,7 +831,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
     // solar/load/control
     //
-    if ( strncmp( topic, "solar/load/control", strlen("solar/load/control") ) == 0 ){
+    if ( strncmp( topic, "homeassistant/solar/load/control", strlen("homeassistant/solar/load/control") ) == 0 ){
 
         // Switch - but i can't seem to switch a coil directly here ?!?
         if ( strncmp( (char *) payload , "1",1) == 0 || strcmp( (char *) payload , "on") == 0  ) {
