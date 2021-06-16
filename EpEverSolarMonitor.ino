@@ -61,8 +61,6 @@
 #include <PubSubClient.h>
 
 
-
-
 // settings
 //
 const char* ssid =        "TheWeb";
@@ -203,7 +201,7 @@ void setup(){
         Serial.println( "debug-mode: off" );
     }
         
-        
+
         
         
 
@@ -251,11 +249,8 @@ void setup(){
  */ 
 
 void loop(){
-
-
     
 getanddoepeverinfo();
- 
   
 deepsleep();
     
