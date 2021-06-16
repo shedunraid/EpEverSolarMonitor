@@ -169,7 +169,10 @@ int do_update = 0, switch_load = 0;
 bool loadState = true;
 int debug_mode = 0;             // no sleep and mmore updates
 
-
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- SETUP ---------------------------------
+ *  ------------------------------------------------------------------------
+ */ 
 
 void setup(){
   
@@ -242,13 +245,179 @@ void setup(){
 }
 
 
-
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- MAIN LOOP ---------------------------------
+ *  ------------------------------------------------------------------------
+ */ 
 
 void loop(){
 
 
     
-  // datastructures, also for buffer to values conversion
+getanddoepeverinfo();
+ 
+  
+deepsleep();
+    
+    
+  
+}
+
+
+
+
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- MQTT PUBLISH STRING -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+
+
+void mqtt_publish_s( char* topic , char* msg ){
+
+  Serial.print(topic);
+  Serial.print(": ");
+  Serial.println(msg);
+  
+  mqtt_client.publish(topic, msg);
+  
+}
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- MQTT PUBLISH FLOAT -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+void mqtt_publish_f( char* topic , float value  ){
+
+  Serial.print(topic);
+  Serial.print(": ");
+  
+  snprintf (mqtt_msg, 64, "%7.3f", value);
+  Serial.println(mqtt_msg);
+  
+  mqtt_client.publish(topic, mqtt_msg);
+  
+}
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- MQTT PUBLISH INT -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+void mqtt_publish_i( char* topic , int value  ){
+
+  Serial.print(topic);
+  Serial.print(": ");
+  
+  snprintf (mqtt_msg, 64, " %d", value);
+  Serial.println(mqtt_msg);
+  
+  mqtt_client.publish(topic, mqtt_msg);
+  
+}
+
+/*  ------------------------------------------------------------------------
+ *  ---------------------------- PRE / POST TRANSMISSION -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+
+void preTransmission()
+{
+  digitalWrite(MAX485_RE, 1);
+  digitalWrite(MAX485_DE, 1);
+  
+  digitalWrite(LED,LOW);
+}
+
+void postTransmission()
+{
+  digitalWrite(MAX485_RE, 0);
+  digitalWrite(MAX485_DE, 0);
+  
+  digitalWrite(LED,HIGH);
+}
+
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- MQTT RECONNECT -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+void mqtt_reconnect() {
+  
+  // Loop until we're reconnected
+  while (!mqtt_client.connected()) {
+    
+    Serial.print("Attempting MQTT connection...");
+    
+    // Create a client ID
+    String clientId = "EpEver Solar Monitor";
+    
+    // Attempt to connect
+    if (mqtt_client.connect(clientId.c_str())) {
+      
+      Serial.println("connected");
+      
+      // Once connected, publish an announcement...
+      mqtt_client.publish("homeassistant/solar", "online");
+      do_update = 1;
+      
+      // ... and resubscribe
+      mqtt_client.subscribe("homeassistant/solar/load/control");
+      mqtt_client.subscribe("homeassistant/solar/setting/sleep");
+      
+      
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(mqtt_client.state());
+      Serial.println(" try again in 5 seconds");
+      
+      // Wait 5 seconds before retrying
+      delay(5000);
+    }
+  }
+}
+
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- MQTT CALL BACK ---- -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+// control load on / off here, setting sleep duration
+//
+void mqtt_callback(char* topic, byte* payload, unsigned int length) {
+
+    Serial.print("Message arrived [");
+    Serial.print(topic);
+    Serial.print("] ");
+    for (int i = 0; i < length; i++) {
+        Serial.print((char)payload[i]);
+    }
+    Serial.println();
+
+    payload[length] = '\0';
+
+    
+
+    // solar/load/control
+    //
+    if ( strncmp( topic, "homeassistant/solar/load/control", strlen("homeassistant/solar/load/control") ) == 0 ){
+
+        // Switch - but i can't seem to switch a coil directly here ?!?
+        if ( strncmp( (char *) payload , "1",1) == 0 || strcmp( (char *) payload , "on") == 0  ) {
+            loadState = true;
+            do_update = 1;
+            switch_load = 1;
+        } 
+        if ( strncmp( (char *) payload , "0",1) == 0 || strcmp( (char *) payload , "off") == 0  ) {
+            loadState = false;
+            do_update = 1;
+            switch_load = 1;
+        } 
+    } 
+    
+}
+/*  ------------------------------------------------------------------------
+ *  ------------------------- MAIN EPEVER LOOP FOR --------------------------
+ *  --------------- READING EEVER MODBUS, AND SENDING AS MQTT --------------
+ *  ------------------------------------------------------------------------
+ */ 
+
+void getanddoepeverinfo(){
+    // datastructures, also for buffer to values conversion
   //
   uint8_t i, result;
   
@@ -576,9 +745,13 @@ void loop(){
   Serial.println();
   Serial.println("BLLLLLLLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHH");
   Serial.println(live.l.bT/100.f);
+  
+  // time
+  //
+  sprintf(buf, "20%02d-%02d-%02d %02d:%02d:%02d" ,
+    rtc.r.y , rtc.r.M , rtc.r.d , rtc.r.h , rtc.r.m , rtc.r.s
+  );
 
-  
-  
   
   // Go Online to publish via mqtt
   //
@@ -613,12 +786,7 @@ void loop(){
   //
   Serial.println("Publishing: ");
     
-  
-  // time
-  //
-  sprintf(buf, "20%02d-%02d-%02d %02d:%02d:%02d" ,
-    rtc.r.y , rtc.r.M , rtc.r.d , rtc.r.h , rtc.r.m , rtc.r.s
-  );
+
   mqtt_publish_s( "homeassistant/solar/status/time", buf );
 
   
@@ -695,8 +863,14 @@ void loop(){
     } 
     
   }
+}
+/*  ------------------------------------------------------------------------
+ *  -------------------------------- DEEP SLEEP CALL ---- -------------------
+ *  ------------------------------------------------------------------------
+ */ 
+void deepsleep(){
   
-  mqtt_publish_s("homeassistant/solar", "sleep");
+mqtt_publish_s("homeassistant/solar", "sleep");
   delay(1000);
   
   
@@ -714,138 +888,4 @@ void loop(){
   ESP.deepSleep(sleepSeconds * 1000000);
   
     
-    
-    
-  
-}
-
-
-
-
-
-
-
-void mqtt_publish_s( char* topic , char* msg ){
-
-  Serial.print(topic);
-  Serial.print(": ");
-  Serial.println(msg);
-  
-  mqtt_client.publish(topic, msg);
-  
-}
-
-void mqtt_publish_f( char* topic , float value  ){
-
-  Serial.print(topic);
-  Serial.print(": ");
-  
-  snprintf (mqtt_msg, 64, "%7.3f", value);
-  Serial.println(mqtt_msg);
-  
-  mqtt_client.publish(topic, mqtt_msg);
-  
-}
-void mqtt_publish_i( char* topic , int value  ){
-
-  Serial.print(topic);
-  Serial.print(": ");
-  
-  snprintf (mqtt_msg, 64, " %d", value);
-  Serial.println(mqtt_msg);
-  
-  mqtt_client.publish(topic, mqtt_msg);
-  
-}
-
-
-
-void preTransmission()
-{
-  digitalWrite(MAX485_RE, 1);
-  digitalWrite(MAX485_DE, 1);
-  
-  digitalWrite(LED,LOW);
-}
-
-void postTransmission()
-{
-  digitalWrite(MAX485_RE, 0);
-  digitalWrite(MAX485_DE, 0);
-  
-  digitalWrite(LED,HIGH);
-}
-
-
-void mqtt_reconnect() {
-  
-  // Loop until we're reconnected
-  while (!mqtt_client.connected()) {
-    
-    Serial.print("Attempting MQTT connection...");
-    
-    // Create a client ID
-    String clientId = "EpEver Solar Monitor";
-    
-    // Attempt to connect
-    if (mqtt_client.connect(clientId.c_str())) {
-      
-      Serial.println("connected");
-      
-      // Once connected, publish an announcement...
-      mqtt_client.publish("homeassistant/solar", "online");
-      do_update = 1;
-      
-      // ... and resubscribe
-      mqtt_client.subscribe("homeassistant/solar/load/control");
-      mqtt_client.subscribe("homeassistant/solar/setting/sleep");
-      
-      
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(mqtt_client.state());
-      Serial.println(" try again in 5 seconds");
-      
-      // Wait 5 seconds before retrying
-      delay(5000);
-    }
-  }
-}
-
-
-// control load on / off here, setting sleep duration
-//
-void mqtt_callback(char* topic, byte* payload, unsigned int length) {
-
-    Serial.print("Message arrived [");
-    Serial.print(topic);
-    Serial.print("] ");
-    for (int i = 0; i < length; i++) {
-        Serial.print((char)payload[i]);
-    }
-    Serial.println();
-
-    payload[length] = '\0';
-
-    
-
-    // solar/load/control
-    //
-    if ( strncmp( topic, "homeassistant/solar/load/control", strlen("homeassistant/solar/load/control") ) == 0 ){
-
-        // Switch - but i can't seem to switch a coil directly here ?!?
-        if ( strncmp( (char *) payload , "1",1) == 0 || strcmp( (char *) payload , "on") == 0  ) {
-            loadState = true;
-            do_update = 1;
-            switch_load = 1;
-        } 
-        if ( strncmp( (char *) payload , "0",1) == 0 || strcmp( (char *) payload , "off") == 0  ) {
-            loadState = false;
-            do_update = 1;
-            switch_load = 1;
-        } 
-    } 
-    
-    
-
 }
