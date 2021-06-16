@@ -1,36 +1,25 @@
-
 /*
-
     This code is for reading live-, statistical and status-data from
     an EpEver LandStar B ( LS1024B ) via a Modbus connection.
-
     The data is then published via mqtt to be fed to gafana and pimatic.
-
     This code started as a small sketch to read the data via modbus and 
     then got additions for mqtt, deep-sleep, debug a.t.l.. It got quite big 
     an should get some restructuring...
-
     If you have another EpEver charge controller (like a Tracer), 
     you may need to adjust the register/data locations according 
     to the datasheet.
-
     I'm using a NodeMCU clone (Board: Lolin Wemos D1 R2 & mini) and a 
     widespread MAX485 breakout module to connect to the RJ45 port of the 
     solar charge controller.
-
     Both modules are powered using the (in my case) 7.5 Volt supply-voltage
     that is available at the RJ45 port. If you're using another esp module 
     (e.g. Wemos D1 mini), make sure, the onboard voltage-regulator can 
     handle the 7.5 volts from the EpEver.
-
     To avoid the need of a level-shifter, the max485 module is powered only
     with 3V3 from the NodeMCU, which works for me, but YMMV.
-
     Power-consumption is roughly 4mA during Deep-Sleep, mostly due to the 
     onboard leds, I guess. When running, the power-demand gets up to about 
     75mA for 3-4 seconds. 
-
-
     Connections:
         
         MAX485         NodeMCU 
@@ -41,49 +30,28 @@
             VCC             3V3 !!!
             GND             GND
             
-
-
         EpEver RJ45                        MAX485      NodeMCU
         pin1  +7.5 V       org-wht                       Vin
         pin8  GND          brn                           GND
         pin6  RS-485-A     grn               A
         pin4  RS-485-B     blu               B
-
-
     connect DE (Max485) with a pull-down resistor (e.g. 6k7) to GND,
     to hold that line down in Deep-Sleep to lower power consumption
-
-
     connect D0 (NodeMCU) with reset (NodeMCU) for DeepSleep wake-up to work
-
-
     connect D6 (NodeMCU)and D7 (NodeMCU) to enable debug-mode. this 
     sets the sleep duration to only 10 seconds
-
-
-
     some datasheets list different pinouts for the RJ45 jack!  swap A<->B if 
     connection fails. Check voltage-level and -polarity before connecting!
-
-
-
     I'm excessively using the union-struct trick to map buffer-data 
     to structs here. Most of the defines for the data-locations
     are for reference only and not actually used in the code
-
-
-
     I got loads of info for this from:
-
         https://www.eevblog.com/forum/projects/nodemcu-esp8266-rs485-epever-solar-monitor-diy/
         http://4-20ma.io/ModbusMaster
         
         
-
     For taking the data to grafana, have a look here: 
-
         https://github.com/glitterkitty/mqtt-mysql
-
  
 */
 
@@ -97,10 +65,10 @@
 
 // settings
 //
-const char* ssid =        "your_ssid";
-const char* password =    "your_pass";
-const char* mqtt_server = "you_broker";
-uint16_t sleepSeconds =    120;         // 2 minutes default
+const char* ssid =        "TheWeb";
+const char* password =    "Dubstep182";
+const char* mqtt_server = "192.168.1.172";
+uint16_t sleepSeconds =    30;         // 2 minutes default
 
 
 
@@ -117,7 +85,7 @@ uint16_t sleepSeconds =    120;         // 2 minutes default
 // ModBus Register Locations
 //
 #define LIVE_DATA       0x3100     // start of live-data 
-#define LIVE_DATA_CNT   16         // 16 regs
+#define LIVE_DATA_CNT   17         // 16 regs
 
 // just for reference, not used in code
 #define PANEL_VOLTS     0x00       
@@ -136,6 +104,8 @@ uint16_t sleepSeconds =    120;         // 2 minutes default
 #define LOAD_AMPS       0x0D
 #define LOAD_POWER_L    0x0E
 #define LOAD_POWER_H    0x0F
+
+#define BATT_TEMP       0x10
 
 
 
@@ -262,7 +232,7 @@ void setup(){
     pinMode(LED, OUTPUT); 
     digitalWrite(LED, HIGH);
     
-    
+      
 
     // mqtt init
     mqtt_client.setServer(mqtt_server, 1883);
@@ -276,7 +246,7 @@ void setup(){
 
 void loop(){
 
-  
+
     
   // datastructures, also for buffer to values conversion
   //
@@ -314,9 +284,11 @@ void loop(){
       int16_t  lV;
       int16_t  lI;
       int32_t  lP; 
+        
+      int16_t  bT;
 
     } l;
-    uint16_t  buf[16];
+    uint16_t  buf[17];
   } live;
 
 
@@ -602,7 +574,8 @@ void loop(){
   Serial.printf( "\n    batt.temp:         %s   ",     batt_temp_status[status_batt.temp] );
   Serial.printf( "\n    charger.charging:  %s   ",     charger_charging_status[ charger_mode] );
   Serial.println();
-  Serial.println();
+  Serial.println("BLLLLLLLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHHHHHHHHHHHHHHHHHHHHHHHHH");
+  Serial.println(live.l.bT/100.f);
 
   
   
@@ -651,44 +624,46 @@ void loop(){
   
   // panel
   // 
-  mqtt_publish_f( "solar/panel/V", live.l.pV /100.f);
-  mqtt_publish_f( "solar/panel/I", live.l.pI /100.f);
-  mqtt_publish_f( "solar/panel/P", live.l.pP /100.f);
+  mqtt_publish_f( "homeassistant/solar/panel/V", live.l.pV /100.f);
+  mqtt_publish_f( "homeassistant/solar/panel/I", live.l.pI /100.f);
+  mqtt_publish_f( "homeassistant/solar/panel/P", live.l.pP /100.f);
   
-  mqtt_publish_f( "solar/battery/V", live.l.bV /100.f);
-  mqtt_publish_f( "solar/battery/I", live.l.bI /100.f);
-  mqtt_publish_f( "solar/battery/P", live.l.bP /100.f);
+  mqtt_publish_f( "homeassistant/solar/battery/V", live.l.bV /100.f);
+  mqtt_publish_f( "homeassistant/solar/battery/I", live.l.bI /100.f);
+  mqtt_publish_f( "homeassistant/solar/battery/P", live.l.bP /100.f);
   
-  mqtt_publish_f( "solar/load/V", live.l.lV /100.f);
-  mqtt_publish_f( "solar/load/I", live.l.lI /100.f);
-  mqtt_publish_f( "solar/load/P", live.l.lP /100.f);
+  mqtt_publish_f( "homeassistant/solar/load/V", live.l.lV /100.f);
+  mqtt_publish_f( "homeassistant/solar/load/I", live.l.lI /100.f);
+  mqtt_publish_f( "homeassistant/solar/load/P", live.l.lP /100.f);
 
 
-  mqtt_publish_f( "solar/co2reduction/t", stats.s.c02Reduction/100.f);
-  mqtt_publish_f( "solar/battery/SOC",   batterySOC/1.0f);
-  mqtt_publish_f( "solar/battery/netI",  batteryCurrent/100.0f);
-  mqtt_publish_s( "solar/load/state",    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
+  mqtt_publish_f( "homeassistant/solar/co2reduction/t", stats.s.c02Reduction/100.f);
+  mqtt_publish_f( "homeassistant/solar/battery/SOC",   batterySOC/1.0f);
+  mqtt_publish_f( "homeassistant/solar/battery/netI",  batteryCurrent/100.0f);
+  mqtt_publish_s( "homeassistant/solar/load/state",    (char*) (loadState == 1? "on": "off") );  // pimatic state topic does not work with integers or floats ?!?
    
   
-  mqtt_publish_f( "solar/battery/minV", stats.s.bVmin /100.f);
-  mqtt_publish_f( "solar/battery/maxV", stats.s.bVmax /100.f);
+  mqtt_publish_f( "homeassistant/solar/battery/minV", stats.s.bVmin /100.f);
+  mqtt_publish_f( "homeassistant/solar/battery/maxV", stats.s.bVmax /100.f);
   
-  mqtt_publish_f( "solar/panel/minV", stats.s.pVmin /100.f);
-  mqtt_publish_f( "solar/panel/maxV", stats.s.pVmax /100.f);
+  mqtt_publish_f( "homeassistant/solar/panel/minV", stats.s.pVmin /100.f);
+  mqtt_publish_f( "homeassistant/solar/panel/maxV", stats.s.pVmax /100.f);
   
-  mqtt_publish_f( "solar/energy/consumed_day", stats.s.consEnerDay/100.f );
-  mqtt_publish_f( "solar/energy/consumed_all", stats.s.consEnerTotal/100.f );
+  mqtt_publish_f( "homeassistant/solar/energy/consumed_day", stats.s.consEnerDay/100.f );
+  mqtt_publish_f( "homeassistant/solar/energy/consumed_all", stats.s.consEnerTotal/100.f );
 
-  mqtt_publish_f( "solar/energy/generated_day", stats.s.genEnerDay/100.f );
-  mqtt_publish_f( "solar/energy/generated_all",  stats.s.genEnerTotal/100.f );
+  mqtt_publish_f( "homeassistant/solar/energy/generated_day", stats.s.genEnerDay/100.f );
+  mqtt_publish_f( "homeassistant/solar/energy/generated_day", stats.s.genEnerMon/100.f );
+  mqtt_publish_f( "homeassistant/solar/energy/generated_all",  stats.s.genEnerTotal/100.f );
 
 
-  mqtt_publish_s( "solar/status/batt_volt", batt_volt_status[status_batt.volt] );
-  mqtt_publish_s( "solar/status/batt_temp", batt_temp_status[status_batt.temp] );
+  mqtt_publish_s( "homeassistant/solar/status/batt_volt", batt_volt_status[status_batt.volt] );
+  mqtt_publish_s( "homeassistant/solar/status/batt_temp", batt_temp_status[status_batt.temp] );
 
   //mqtt_publish_s( "solar/status/charger_input", charger_input_status[ charger_input ]  );
-  mqtt_publish_s( "solar/status/charger_mode",  charger_charging_status[ charger_mode ] );
-  
+  mqtt_publish_s( "homeassistant/solar/status/charger_mode",  charger_charging_status[ charger_mode ] );
+  mqtt_publish_f( "homeassistant/solar/status/battery_temp",  live.l.bT /100.f );
+
 
 
 
