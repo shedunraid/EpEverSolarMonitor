@@ -1,0 +1,70 @@
+Project Scope:
+
+1. To read values and change settings of the Epever tracer series of controllers.
+2. To have a webserver that allows changes from self hosted page
+3. To have touchscreen for user pages and settings
+
+
+Pages:
+
+	- Battery Settings							REGISTER		DEFAULT VALUE
+
+	 	- Battery Type							0x9000				0	
+	 	- Rate Voltage Level					0x9067				12
+	 	- Charging Mode							0x9070				0
+	 	- Battery Capacity						0x9001				992
+	 	- Temp Compensation						0x9002				-3
+	 	- Over Volt Disconnect					0x9003				15.50
+	 	- Charging Limit Voltage				0x9004				14.90
+	 	- Over Volt Reconnect					0x9005				14.80
+	 	- Equalize Charge Voltage				0x9006				14.60
+	 	- Boot Charge Voltage					0x9007				14.40
+	 	- Float Charge Voltage					0x9008				13.80
+	 	- Boost Reconect Voltage				0x9009				13.20
+	 	- Low Volt Recconect Voltage			0x900A				12.60
+	 	- Under Volt Warn Reconnect Voltage		0x900B				12.20
+	 	- Under Volt Warning Voltage			0x900C				12.00
+	 	- Low Volt Disconnect Voltage			0x900D				11.10
+	 	
+	 	- Boost Duration minutes				0x906C				120
+	 	- Equalistation Duration minutes		0x906B				120
+	 	- Battery Charge % (do not change)		0x906E				100
+	 	- Battery Discharge % (do not change)	0x906D				???
+
+
+
+
+	- Device Settings							REGISTER		DEFAULT VALUE
+
+	 	- Backlight controller 					9063			60  (0-999s)
+	 	- Device Over Temp						9019 			85  (40-100c)
+	 	- Device Recover Temp					901A			75  (30-80c)
+	 	- Battery Upper Temp					9017			65  (50-80c)
+	 	- Battery Lower Temp					9018			-40 (0- -40c)		
+
+
+
+
+
+
+	- Load Settings								REGISTER		DEFAULT VALUE
+
+	 	- Load Control Mode						903D				0000H  // manually on by default
+	 	- TBC for other settings
+
+
+
+
+
+	 - Time Settings							REGISTER		DEFAULT VALUE
+	 	
+	 	- Device Time							9013-9015		
+
+	 			TBC - involved High byte and Low Byte shit
+
+
+
+
+
+
+
