@@ -59,6 +59,7 @@
 #include <ModbusMaster.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include <SoftwareSerial.h>
 
 
 // settings
@@ -155,8 +156,22 @@ uint16_t sleepSeconds =    30;         // 2 minutes default
 #define STATUS_CHARGER    0x01  // Charging equipment status register
 
 
+/*!
+  We're using a MAX485-compatible RS485 Transceiver.
+  Rx/Tx is hooked up to the hardware serial port at 'Serial'.
+  The Data Enable and Receiver Enable pins are hooked up as follows:
+*/
+#define MAX485_DE      D2
+#define MAX485_RE_NEG  D1
 
-ModbusMaster node;   // instantiate ModbusMaster object
+#define RO_RX D5
+#define DI_TX D6
+
+// instantiate ModbusMaster object
+ModbusMaster node;
+
+SoftwareSerial mySerial(RO_RX, DI_TX); 
+
 
 WiFiClient wifi_client;
 PubSubClient mqtt_client(wifi_client);
@@ -177,6 +192,7 @@ void setup(){
 
     // say hello
     Serial.begin(115200);
+   
     while (!Serial) { ; }
     Serial.println();
     Serial.println("Hello World! I'm an EpEver Solar Monitor!");
@@ -216,10 +232,10 @@ void setup(){
     digitalWrite(MAX485_RE, 0);
     digitalWrite(MAX485_DE, 0);
 
-
+ mySerial.begin(115200);
     
     // EPEver Device ID 1
-    node.begin(1, Serial);
+    node.begin(1, mySerial);
 
 
     
